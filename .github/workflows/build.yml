@@ -1,0 +1,43 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcode-select -p
+          xcrun swift --version
+
+      - name: Build Porthole.app
+        run: scripts/build.sh
+
+      - name: Smoke test the CLI
+        run: |
+          dist/Porthole.app/Contents/MacOS/Porthole --help
+          dist/Porthole.app/Contents/MacOS/Porthole --list
+
+      - name: Package
+        run: ditto -c -k --keepParent dist/Porthole.app dist/Porthole.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Porthole
+          path: dist/Porthole.zip
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Porthole.zip
+          generate_release_notes: true
