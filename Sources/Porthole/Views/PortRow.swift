@@ -11,7 +11,8 @@ struct PortRow: View {
     @State private var copied = false
 
     private var isExpanded: Bool { store.isExpanded(entry) }
-    private var showActions: Bool { hovering || confirmingKill || isExpanded }
+    private var demoHover: Bool { store.demoHoverKey == entry.portKey }
+    private var showActions: Bool { hovering || confirmingKill || isExpanded || demoHover }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -40,7 +41,7 @@ struct PortRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .background(hovering || isExpanded ? Color.primary.opacity(isExpanded ? 0.035 : 0.05) : Color.clear)
+        .background(hovering || isExpanded || demoHover ? Color.primary.opacity(isExpanded ? 0.035 : 0.05) : Color.clear)
         .onHover { inside in
             hovering = inside
             if !inside { confirmingKill = false }

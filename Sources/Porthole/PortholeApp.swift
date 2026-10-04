@@ -10,7 +10,8 @@ struct PortholeApp: App {
         NSApplication.shared.setActivationPolicy(.accessory)  // no Dock icon, even when run outside a bundle
         if CommandLine.arguments.contains("--preview") {
             PreviewWindow.show(expandFirst: CommandLine.arguments.contains("--expand-first"),
-                               thenCollapse: CommandLine.arguments.contains("--then-collapse"))
+                               thenCollapse: CommandLine.arguments.contains("--then-collapse"),
+                               demo: CommandLine.arguments.contains("--demo"))
         }
     }
 
@@ -53,7 +54,7 @@ enum PreviewWindow {
     private static var window: NSWindow?
     private static var controller: NSHostingController<AnyView>?
 
-    static func show(expandFirst: Bool, thenCollapse: Bool = false) {
+    static func show(expandFirst: Bool, thenCollapse: Bool = false, demo: Bool = false) {
         DispatchQueue.main.async {
             let store = PortStore()
             let controller = NSHostingController(rootView: AnyView(ContentView().environmentObject(store)))
@@ -84,6 +85,20 @@ enum PreviewWindow {
                 if expandFirst, let first = store.ports.first { store.toggleDetails(first) }
                 fit()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { fit() }
+                if demo {
+                    // Scripted sequence for the README GIF: hover, open the info panel, close it.
+                    let queue = DispatchQueue.main
+                    queue.asyncAfter(deadline: .now() + 0.8) { store.demoHoverKey = store.ports.first?.portKey }
+                    queue.asyncAfter(deadline: .now() + 2.2) {
+                        if let first = store.ports.first { store.toggleDetails(first) }
+                        queue.asyncAfter(deadline: .now() + 0.6) { fit() }
+                    }
+                    queue.asyncAfter(deadline: .now() + 6.8) {
+                        if let first = store.ports.first { store.toggleDetails(first) }
+                        store.demoHoverKey = nil
+                        queue.asyncAfter(deadline: .now() + 0.4) { fit() }
+                    }
+                }
                 if thenCollapse {
                     // Collapse without calling fit(): the window keeps its tall frame, exactly
                     // what happens to the menu bar panel. WindowBridge is expected to fix it.

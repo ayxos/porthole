@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  <img src="docs/demo.gif" width="420" alt="Porthole: hover a port, open the info panel, close it">
+</p>
+
+<p align="center">
   <img src="docs/screenshot-list.png" width="400" alt="Porthole showing listening ports">
   &nbsp;&nbsp;
   <img src="docs/screenshot-info.png" width="400" alt="Porthole explaining a process">
@@ -44,13 +48,14 @@ xattr -d com.apple.quarantine /Applications/Porthole.app
 
 Then open it normally. It appears in the menu bar only; there is no Dock icon.
 
-### Homebrew (builds from source, no Gatekeeper warning)
+### Homebrew
 
 ```bash
-brew install --HEAD ayxos/tap/porthole
+brew install --cask ayxos/tap/porthole     # prebuilt app from the latest release
+brew install --HEAD ayxos/tap/porthole     # or build it from source (needs Xcode)
 ```
 
-The formula lives in [`homebrew/porthole.rb`](homebrew/porthole.rb). Building on your own machine means the app is signed locally, so Gatekeeper never complains.
+The cask downloads the release zip, so it is subject to the same Gatekeeper prompt as a manual download (`--no-quarantine` skips it). The source build is signed on your own machine, so Gatekeeper never complains. Both live in the [ayxos/homebrew-tap](https://github.com/ayxos/homebrew-tap) repository; the formula is also in [`homebrew/porthole.rb`](homebrew/porthole.rb) here.
 
 ### Build it yourself
 
@@ -110,7 +115,7 @@ Porthole reads local process information through public macOS APIs and never sen
 
 The easiest and most useful contribution is a description for a process you recognise. Open [`Sources/Porthole/ProcessKnowledge.swift`](Sources/Porthole/ProcessKnowledge.swift), add an entry keyed by the executable name (what Porthole shows in the row), with a one or two sentence summary, a category and, if killing it is a bad idea or there is a cleaner way to stop it, a piece of advice. Port and tool hints for the row's second line live in [`Sources/Porthole/KnownServices.swift`](Sources/Porthole/KnownServices.swift).
 
-To work on the UI, `scripts/build.sh --run` rebuilds and relaunches, and `dist/Porthole.app/Contents/MacOS/Porthole --preview --expand-first` shows the popover in a plain floating window with the first row expanded. `PORTHOLE_DEBUG=1` makes the app print scan and visibility events to stderr.
+To work on the UI, `scripts/build.sh --run` rebuilds and relaunches, and `dist/Porthole.app/Contents/MacOS/Porthole --preview --expand-first` shows the popover in a plain floating window with the first row expanded. `PORTHOLE_DEBUG=1` makes the app print scan and visibility events to stderr. `--preview --demo` plays the scripted sequence used to record `docs/demo.gif`, and `scripts/make-social-preview.swift` renders the repository's social preview image.
 
 ```
 Sources/Porthole/

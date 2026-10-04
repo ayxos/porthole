@@ -50,6 +50,9 @@ final class PortStore: ObservableObject {
         }
     }
 
+    /// Row shown in its hover state without a mouse, used by `--preview --demo` to record the README GIF.
+    @Published var demoHoverKey: String?
+
     @Published var sortOrder: SortOrder {
         didSet { defaults.set(sortOrder.rawValue, forKey: Keys.sortOrder) }
     }
