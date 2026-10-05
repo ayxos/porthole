@@ -2,8 +2,8 @@
 # It lives in ayxos/homebrew-tap as Casks/porthole.rb; the release workflow
 # updates version and sha256 there on every tag.
 cask "porthole" do
-  version "1.0.0"
-  sha256 "a9fba8177b6d8b7e405abbc51f8554fb20f0d95b79b514c25a26ed8710bbd266"
+  version "1.0.1"
+  sha256 "c164d6d6057cec4640a158a2ee219c157d172c8d0803624e70884a7d6c10485d"
 
   url "https://github.com/ayxos/porthole/releases/download/v#{version}/Porthole.zip"
   name "Porthole"
