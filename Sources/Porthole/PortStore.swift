@@ -66,6 +66,14 @@ final class PortStore: ObservableObject {
     @Published var refreshInterval: Double {
         didSet { defaults.set(refreshInterval, forKey: Keys.interval); rescheduleTimer() }
     }
+    @Published var checkForUpdates: Bool {
+        didSet {
+            defaults.set(checkForUpdates, forKey: Keys.checkForUpdates)
+            if checkForUpdates { checkForUpdate() } else { availableUpdate = nil }
+        }
+    }
+    /// A newer release on GitHub, when `checkForUpdates` is on and one exists.
+    @Published private(set) var availableUpdate: UpdateChecker.Release?
 
     /// Set by the content view. Drives the refresh cadence.
     var isWindowVisible = false {
@@ -92,12 +100,14 @@ final class PortStore: ObservableObject {
     private var scanning = false
     private var refreshQueued = false
     private var cpuSamples: [pid_t: (cpuTime: TimeInterval, at: Date)] = [:]
+    private var updateTimer: Timer?
 
     private enum Keys {
         static let includeUDP = "includeUDP"
         static let showCount = "showCountInMenuBar"
         static let interval = "refreshInterval"
         static let sortOrder = "sortOrder"
+        static let checkForUpdates = "checkForUpdates"
     }
 
     init() {
@@ -106,9 +116,11 @@ final class PortStore: ObservableObject {
         let saved = defaults.double(forKey: Keys.interval)
         refreshInterval = saved > 0 ? saved : 3
         sortOrder = SortOrder(rawValue: defaults.string(forKey: Keys.sortOrder) ?? "") ?? .port
+        checkForUpdates = defaults.object(forKey: Keys.checkForUpdates) as? Bool ?? true
         launchAtLogin = SMAppService.mainApp.status == .enabled
         refresh()
         rescheduleTimer()
+        scheduleUpdateChecks()
     }
 
     // MARK: Derived
@@ -254,6 +266,30 @@ final class PortStore: ObservableObject {
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(seconds))
             self?.refresh()
+        }
+    }
+
+    // MARK: Updates
+
+    private func scheduleUpdateChecks() {
+        // Development builds report "dev" and have nothing to compare against.
+        guard AppInfo.version != "dev", !CommandLine.arguments.contains("--preview") else { return }
+        checkForUpdate()
+        let timer = Timer(timeInterval: 24 * 3600, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.checkForUpdate() }
+        }
+        timer.tolerance = 3600
+        RunLoop.main.add(timer, forMode: .common)
+        updateTimer = timer
+    }
+
+    func checkForUpdate() {
+        guard checkForUpdates, AppInfo.version != "dev" else { return }
+        Task { [weak self] in
+            guard let release = await UpdateChecker.latestRelease(), let self, self.checkForUpdates else { return }
+            let newer = UpdateChecker.isNewer(release.version, than: AppInfo.version)
+            self.debugLog("update check: latest \(release.version), running \(AppInfo.version)")
+            self.availableUpdate = newer ? release : nil
         }
     }
 

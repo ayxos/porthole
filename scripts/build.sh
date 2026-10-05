@@ -5,6 +5,11 @@
 #   scripts/build.sh            build only
 #   scripts/build.sh --run      build and (re)launch
 #   scripts/build.sh --install  build, copy to /Applications and launch
+#
+# ARCHS="arm64 x86_64" scripts/build.sh builds a universal binary (CI does this
+# for releases). The default is the host architecture only, which is faster.
+# SIGN_IDENTITY="Developer ID Application: …" signs with the hardened runtime,
+# ready for notarization. The default is an ad hoc signature.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -13,6 +18,7 @@ BUNDLE_ID="com.ayxos.porthole"
 DIST="dist/$APP_NAME.app"
 OUT=".build/porthole"
 ARCH="$(uname -m)"
+read -r -a ARCH_LIST <<< "${ARCHS:-$ARCH}"
 mkdir -p "$OUT"
 
 # ---------------------------------------------------------------------------
@@ -47,12 +53,17 @@ else
 fi
 SWIFTC="$TOOLCHAIN/usr/bin/swiftc"
 
-echo "▸ compiling $APP_NAME ($ARCH) with $SWIFTC"
-"$SWIFTC" -O -parse-as-library \
-  -sdk "$SDK" -target "$ARCH-apple-macosx14.0" \
-  -module-name "$APP_NAME" "${PLUGIN_FLAGS[@]}" \
-  Sources/Porthole/*.swift Sources/Porthole/Views/*.swift \
-  -o "$OUT/$APP_NAME"
+SLICES=()
+for arch in "${ARCH_LIST[@]}"; do
+  echo "▸ compiling $APP_NAME ($arch) with $SWIFTC"
+  "$SWIFTC" -O -parse-as-library \
+    -sdk "$SDK" -target "$arch-apple-macosx14.0" \
+    -module-name "$APP_NAME" "${PLUGIN_FLAGS[@]}" \
+    Sources/Porthole/*.swift Sources/Porthole/Views/*.swift \
+    -o "$OUT/$APP_NAME-$arch"
+  SLICES+=("$OUT/$APP_NAME-$arch")
+done
+lipo -create "${SLICES[@]}" -output "$OUT/$APP_NAME"
 
 if [ ! -f Resources/AppIcon.icns ]; then
   echo "▸ rendering Resources/AppIcon.icns"
@@ -68,7 +79,12 @@ cp "$OUT/$APP_NAME" "$DIST/Contents/MacOS/$APP_NAME"
 cp Resources/Info.plist "$DIST/Contents/Info.plist"
 cp Resources/AppIcon.icns "$DIST/Contents/Resources/AppIcon.icns"
 printf 'APPL????' > "$DIST/Contents/PkgInfo"
-codesign --force --sign - --identifier "$BUNDLE_ID" "$DIST"
+SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+if [ "$SIGN_IDENTITY" = "-" ]; then
+  codesign --force --sign - --identifier "$BUNDLE_ID" "$DIST"
+else
+  codesign --force --sign "$SIGN_IDENTITY" --identifier "$BUNDLE_ID" --options runtime --timestamp "$DIST"
+fi
 echo "✓ built $DIST"
 
 case "${1:-}" in

@@ -18,7 +18,7 @@
   <img src="docs/screenshot-info.png" width="400" alt="Porthole explaining a process">
 </p>
 
-Native Swift and SwiftUI, no dependencies, about 2 MB. Requires macOS 14 or newer.
+Native Swift and SwiftUI, no dependencies, about 2 MB. Universal binary for Apple silicon and Intel (from 1.0.1; 1.0.0 is Apple silicon only). Requires macOS 14 or newer.
 
 ## What it does
 
@@ -31,7 +31,8 @@ Native Swift and SwiftUI, no dependencies, about 2 MB. Requires macOS 14 or newe
 - **Open** the port in your browser, **copy** the URL, **kill** the process (click twice to confirm; hold ⌥ for SIGKILL). For processes owned by another user there is **Kill as admin**, which uses the standard macOS authorization dialog.
 - **Right-click** for more: copy port, PID or command line, reveal the executable in Finder, force kill.
 - **Filter** by port, process, PID, user, hint or anything in the command line.
-- **Settings**: refresh interval, UDP, menu bar count, sort order, launch at login.
+- **Settings**: refresh interval, UDP, menu bar count, sort order, launch at login, daily update check.
+- **Update notice**: when a newer release is out, the footer shows an *Update* link to its release page. Nothing is downloaded or installed for you.
 - **CLI**: the same binary prints the table with `--list`, or JSON with `--json`.
 
 ## Install
@@ -55,7 +56,7 @@ brew install --cask ayxos/tap/porthole     # prebuilt app from the latest releas
 brew install --HEAD ayxos/tap/porthole     # or build it from source (needs Xcode)
 ```
 
-The cask downloads the release zip, so it is subject to the same Gatekeeper prompt as a manual download (`--no-quarantine` skips it). The source build is signed on your own machine, so Gatekeeper never complains. Both live in the [ayxos/homebrew-tap](https://github.com/ayxos/homebrew-tap) repository; the formula is also in [`homebrew/porthole.rb`](homebrew/porthole.rb) here.
+The cask downloads the release zip, so it is subject to the same Gatekeeper prompt as a manual download (`--no-quarantine` skips it). It also links the CLI as `porthole`. The source build is signed on your own machine, so Gatekeeper never complains. Both live in the [ayxos/homebrew-tap](https://github.com/ayxos/homebrew-tap) repository; the formula is also in [`homebrew/porthole.rb`](homebrew/porthole.rb) here.
 
 ### Build it yourself
 
@@ -67,7 +68,7 @@ cd porthole
 scripts/build.sh --install   # builds dist/Porthole.app, copies it to /Applications and launches it
 ```
 
-`scripts/build.sh` alone just builds, `--run` builds and launches. The script calls the toolchain's `swiftc` directly instead of `swift build`, so it also works before the Xcode license has been accepted (`sudo xcodebuild -license accept`). It prefers Xcode when present, because on recent SDKs the SwiftUI macro plugin only ships inside Xcode. `Package.swift` is there for editors and for `swift build` once the license is accepted.
+`scripts/build.sh` alone just builds, `--run` builds and launches. `ARCHS="arm64 x86_64" scripts/build.sh` produces a universal binary, and `SIGN_IDENTITY="Developer ID Application: …"` signs it with the hardened runtime instead of ad hoc. The script calls the toolchain's `swiftc` directly instead of `swift build`, so it also works before the Xcode license has been accepted (`sudo xcodebuild -license accept`). It prefers Xcode when present, because on recent SDKs the SwiftUI macro plugin only ships inside Xcode. `Package.swift` is there for editors and for `swift build` once the license is accepted.
 
 ## Using it
 
@@ -109,13 +110,17 @@ Run with `sudo` to see every user's processes.
 
 ## Privacy
 
-Porthole reads local process information through public macOS APIs and never sends anything anywhere. The only network access is the **Search the web** button, which opens your browser with the process name as the query. No analytics, no update checks.
+Porthole reads local process information through public macOS APIs and never sends anything anywhere. No analytics. It makes one network request on its own: once a day it asks GitHub's public API for the latest release (`api.github.com/repos/ayxos/porthole/releases/latest`), with no identifiers beyond what any HTTPS request carries. Turn it off with **Check for updates daily** in the settings menu. The **Search the web** button opens your browser with the process name as the query.
 
 ## Contributing
 
 The easiest and most useful contribution is a description for a process you recognise. Open [`Sources/Porthole/ProcessKnowledge.swift`](Sources/Porthole/ProcessKnowledge.swift), add an entry keyed by the executable name (what Porthole shows in the row), with a one or two sentence summary, a category and, if killing it is a bad idea or there is a cleaner way to stop it, a piece of advice. Port and tool hints for the row's second line live in [`Sources/Porthole/KnownServices.swift`](Sources/Porthole/KnownServices.swift).
 
 To work on the UI, `scripts/build.sh --run` rebuilds and relaunches, and `dist/Porthole.app/Contents/MacOS/Porthole --preview --expand-first` shows the popover in a plain floating window with the first row expanded. `PORTHOLE_DEBUG=1` makes the app print scan and visibility events to stderr. `--preview --demo` plays the scripted sequence used to record `docs/demo.gif`, and `scripts/make-social-preview.swift` renders the repository's social preview image.
+
+`scripts/test.sh` runs the tests in [`Tests/PortholeTests/main.swift`](Tests/PortholeTests/main.swift): netstat parsing, hints, process knowledge, project detection, formatting and version comparison, plus a live scan. They are plain Swift with no XCTest, so they run with just the Command Line Tools. CI runs them on every push.
+
+Releases: bump `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist`, then push a `vX.Y.Z` tag. CI builds a universal binary, attaches `Porthole.zip` to a GitHub release and, with a `TAP_TOKEN` secret, updates the cask in ayxos/homebrew-tap. With the `MACOS_CERT_*` and `APPLE_*` secrets described in [the workflow](.github/workflows/build.yml) it also signs with a Developer ID and notarizes.
 
 ```
 Sources/Porthole/
@@ -129,13 +134,15 @@ Sources/Porthole/
   Models.swift             ListeningPort
   Format.swift             compact number formatting
   Shell.swift              tiny Process wrapper
+  UpdateChecker.swift      daily check of the latest GitHub release
   CLI.swift                --list / --json
   MenuBarIcon.swift        template icon drawn with Core Graphics
   Views/                   ContentView, PortRow, ProcessDetailView, FooterView, WindowBridge
 Resources/                 Info.plist, AppIcon.icns (generated by scripts/make-icon.swift)
-scripts/                   build.sh, make-icon.swift
-homebrew/                  formula for a personal tap
-.github/workflows/         CI build; tags starting with v publish Porthole.zip as a release
+Tests/PortholeTests/       dependency-free test runner (scripts/test.sh)
+scripts/                   build.sh, test.sh, make-icon.swift, make-social-preview.swift
+homebrew/                  formula and cask, mirrored in ayxos/homebrew-tap
+.github/workflows/         CI: tests and build; v* tags publish Porthole.zip and bump the cask
 ```
 
 ## License

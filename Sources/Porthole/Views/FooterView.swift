@@ -21,6 +21,12 @@ struct FooterView: View {
                     .help(error)
             }
             Spacer()
+            if let update = store.availableUpdate {
+                Button("Update: \(update.version)") { NSWorkspace.shared.open(update.url) }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                    .help("Porthole \(update.version) is available. Opens the release page.")
+            }
             Menu {
                 settingsMenu
             } label: {
@@ -65,6 +71,7 @@ struct FooterView: View {
             get: { store.launchAtLogin },
             set: { store.setLaunchAtLogin($0) }
         ))
+        Toggle("Check for updates daily", isOn: $store.checkForUpdates)
         Divider()
         Text("Porthole \(AppInfo.version) · ayxosLabs")
         Button("Quit Porthole") { NSApp.terminate(nil) }

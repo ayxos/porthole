@@ -8,13 +8,13 @@
 # Building from source sidesteps Gatekeeper's warning about unnotarized
 # downloads, because the app is signed ad hoc on the user's own machine.
 class Porthole < Formula
-  desc "Menu bar app that shows listening ports and their processes, and lets you open or kill them"
+  desc "Menu bar app that shows listening ports and their processes"
   homepage "https://github.com/ayxos/porthole"
-  head "https://github.com/ayxos/porthole.git", branch: "main"
   license "MIT"
+  head "https://github.com/ayxos/porthole.git", branch: "main"
 
-  depends_on :macos => :sonoma
   depends_on xcode: ["15.0", :build]
+  depends_on macos: :sonoma
 
   def install
     system "scripts/build.sh"

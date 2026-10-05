@@ -78,7 +78,11 @@ enum PortScanner {
         guard let headerIndex = lines.firstIndex(where: { $0.hasPrefix("Proto") }) else { return [] }
         let header = lines[headerIndex].split(separator: " ").map(String.init)
         let hasProcessColumn = header.contains("process:pid")
-        let legacyPidColumn = header.firstIndex(of: "pid")
+        // "Local Address" and "Foreign Address" are one column each in the rows
+        // but two words in the header.
+        let legacyPidColumn = header.firstIndex(of: "pid").map { pid in
+            pid - header[..<pid].filter { $0 == "Address" }.count
+        }
         let hasStateColumn = header.contains("(state)")
         let prefix = proto == .tcp ? "tcp" : "udp"
 
